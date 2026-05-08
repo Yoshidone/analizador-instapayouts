@@ -122,15 +122,13 @@ if archivo is not None:
         "tipo_de_cuenta",
         "estado",
         "fecha_pagado_rechazado_peru",
-        "itf",
         "comision_destino",
         "comision_origen",
-        "yape_id",
         "fee_gmoney"
     ]
 
     # =====================================================
-    # SOLO COLUMNAS IMPORTANTES
+    # FILTRAR COLUMNAS
     # =====================================================
 
     columnas_existentes = [
@@ -141,7 +139,7 @@ if archivo is not None:
     df = df[columnas_existentes].copy()
 
     # =====================================================
-    # CONVERTIR COLUMNAS A STRING
+    # CONVERTIR A STRING
     # =====================================================
 
     for col in df.columns:
@@ -196,7 +194,7 @@ if archivo is not None:
     )
 
     # =====================================================
-    # FECHA
+    # FECHAS
     # =====================================================
 
     df["creacion_deuda_fecha_peru"] = pd.to_datetime(
@@ -211,7 +209,7 @@ if archivo is not None:
     df["mes"] = df["creacion_deuda_fecha_peru"].dt.strftime("%Y-%m")
 
     # =====================================================
-    # FILTRO MES
+    # FILTRO POR MES
     # =====================================================
 
     meses = sorted(
@@ -238,7 +236,7 @@ if archivo is not None:
 
     # =====================================================
     # COMISION DESTINO
-    # SOLO BCP / BBVA
+    # SOLO SI NO ES GMONEY
     # =====================================================
 
     df_filtrado["comision_destino"] = np.where(
@@ -258,7 +256,7 @@ if archivo is not None:
 
     # =====================================================
     # COMISION ORIGEN
-    # SOLO BCP / BBVA
+    # SOLO SI NO ES GMONEY
     # =====================================================
 
     df_filtrado["comision_origen"] = np.where(
@@ -274,7 +272,7 @@ if archivo is not None:
     )
 
     # =====================================================
-    # GMONEY
+    # FEE GMONEY
     # =====================================================
 
     df_filtrado["fee_gmoney"] = np.where(
