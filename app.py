@@ -61,7 +61,7 @@ h1, h2, h3 {
 """, unsafe_allow_html=True)
 
 # =====================================================
-# TÍTULO
+# TITULO
 # =====================================================
 
 st.title("💸 Analizador INSTAPAYOUTS")
@@ -101,7 +101,11 @@ if archivo is not None:
     # LIMPIAR COLUMNAS
     # =====================================================
 
-    df.columns = df.columns.str.strip().str.lower()
+    df.columns = (
+        df.columns
+        .str.strip()
+        .str.lower()
+    )
 
     # =====================================================
     # COLUMNAS IMPORTANTES
@@ -123,10 +127,6 @@ if archivo is not None:
         "estado",
         "fecha_pagado_rechazado_peru"
     ]
-
-    # =====================================================
-    # FILTRAR COLUMNAS
-    # =====================================================
 
     columnas_existentes = [
         col for col in columnas_importantes
@@ -171,34 +171,39 @@ if archivo is not None:
     porcentaje_comision = st.sidebar.number_input(
         "Porcentaje Comisión (%)",
         min_value=0.0,
-        value=1.20,
+        value=1.10,
         step=0.1
     )
 
     tarifa_fija = st.sidebar.number_input(
         "Tarifa Fija",
         min_value=0.0,
-        value=1.00,
+        value=0.00,
         step=0.1
     )
 
     comision_minima = st.sidebar.number_input(
         "Comisión mínima",
         min_value=0.0,
-        value=3.30,
+        value=3.10,
         step=0.1
+    )
+
+    aplicar_comision_minima = st.sidebar.checkbox(
+        "Aplicar comisión mínima",
+        value=True
     )
 
     tarifa_gmoney = st.sidebar.number_input(
         "Tarifa GMONEY",
         min_value=0.0,
-        value=0.50,
+        value=0.00,
         step=0.1
     )
 
     gmoney_misma_comision = st.sidebar.checkbox(
         "GMONEY usa misma comisión",
-        value=False
+        value=True
     )
 
     aplicar_igv = st.sidebar.checkbox(
@@ -244,10 +249,10 @@ if archivo is not None:
     df_filtrado = df_filtrado[
         df_filtrado["moneda"]
         == moneda_seleccionada
-    ]
+    ].copy()
 
     # =====================================================
-    # DETECCIÓN GMONEY
+    # DETECTAR GMONEY
     # =====================================================
 
     es_gmoney = (
@@ -283,22 +288,30 @@ if archivo is not None:
     # COMISION FINAL
     # =====================================================
 
-    if gmoney_misma_comision:
+    if aplicar_comision_minima:
 
-        df_filtrado["comision_final"] = np.maximum(
-            df_filtrado["comision_variable"],
-            comision_minima
-        )
+        if gmoney_misma_comision:
 
-    else:
-
-        df_filtrado["comision_final"] = np.where(
-            es_gmoney,
-            0,
-            np.maximum(
+            df_filtrado["comision_final"] = np.maximum(
                 df_filtrado["comision_variable"],
                 comision_minima
             )
+
+        else:
+
+            df_filtrado["comision_final"] = np.where(
+                es_gmoney,
+                0,
+                np.maximum(
+                    df_filtrado["comision_variable"],
+                    comision_minima
+                )
+            )
+
+    else:
+
+        df_filtrado["comision_final"] = (
+            df_filtrado["comision_variable"]
         )
 
     # =====================================================
@@ -528,10 +541,6 @@ if archivo is not None:
         file_name=f"reporte_instapayouts_{mes_seleccionado}_{moneda_seleccionada}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-
-# =====================================================
-# SIN ARCHIVO
-# =====================================================
 
 else:
 
