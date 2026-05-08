@@ -375,10 +375,24 @@ if archivo is not None:
     # RESULTADO FINAL
     # =====================================================
 
+    df_resultado = df_filtrado.copy()
+
+    # EVITAR ERROR PYARROW
+
+    for col in df_resultado.columns:
+
+        try:
+            df_resultado[col] = (
+                df_resultado[col]
+                .astype(str)
+            )
+        except:
+            pass
+
     st.subheader("📊 Resultado Final")
 
     st.dataframe(
-        df_filtrado,
+        df_resultado,
         use_container_width=True,
         height=650
     )
