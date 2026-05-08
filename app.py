@@ -4,7 +4,7 @@ import numpy as np
 from io import BytesIO
 
 # =====================================================
-# CONFIGURACIÓN
+# CONFIGURACIÓN GENERAL
 # =====================================================
 
 st.set_page_config(
@@ -32,29 +32,19 @@ h1, h2, h3 {
     color: #0f172a;
 }
 
-.stButton>button {
-    background-color: #2563eb;
-    color: white;
-    border-radius: 10px;
-    border: none;
-    padding: 0.5rem 1rem;
-    font-weight: 600;
+[data-testid="metric-container"] {
+    background: white;
+    border-radius: 15px;
+    padding: 15px;
+    box-shadow: 0px 2px 8px rgba(0,0,0,0.08);
 }
 
 .stDownloadButton>button {
     background-color: #16a34a;
     color: white;
     border-radius: 10px;
-    padding: 0.5rem 1rem;
     border: none;
     font-weight: 600;
-}
-
-[data-testid="metric-container"] {
-    background-color: white;
-    border-radius: 15px;
-    padding: 15px;
-    box-shadow: 0px 2px 8px rgba(0,0,0,0.08);
 }
 
 </style>
@@ -77,7 +67,7 @@ archivo = st.file_uploader(
 )
 
 # =====================================================
-# SI EXISTE ARCHIVO
+# SI HAY ARCHIVO
 # =====================================================
 
 if archivo is not None:
@@ -94,7 +84,7 @@ if archivo is not None:
 
     except Exception as e:
 
-        st.error(f"❌ Error al leer archivo: {e}")
+        st.error(f"❌ Error leyendo archivo: {e}")
         st.stop()
 
     # =====================================================
@@ -112,6 +102,7 @@ if archivo is not None:
     # =====================================================
 
     columnas_importantes = [
+
         "creacion_deuda_fecha_peru",
         "cus_name",
         "operador_dispersion",
@@ -126,11 +117,14 @@ if archivo is not None:
         "tipo_de_cuenta",
         "estado",
         "fecha_pagado_rechazado_peru"
+
     ]
 
     columnas_existentes = [
+
         col for col in columnas_importantes
         if col in df.columns
+
     ]
 
     df = df[columnas_existentes].copy()
@@ -163,7 +157,7 @@ if archivo is not None:
     )
 
     # =====================================================
-    # SIDEBAR
+    # SIDEBAR CONFIGURACIÓN
     # =====================================================
 
     st.sidebar.header("⚙️ Configuración")
@@ -187,11 +181,6 @@ if archivo is not None:
         min_value=0.0,
         value=3.10,
         step=0.1
-    )
-
-    aplicar_comision_minima = st.sidebar.checkbox(
-        "Aplicar comisión mínima",
-        value=True
     )
 
     tarifa_gmoney = st.sidebar.number_input(
@@ -256,10 +245,12 @@ if archivo is not None:
     # =====================================================
 
     es_gmoney = (
+
         df_filtrado["operador_dispersion"]
         .astype(str)
         .str.upper()
         .str.contains("GMONEY")
+
     )
 
     # =====================================================
@@ -269,49 +260,54 @@ if archivo is not None:
     if gmoney_misma_comision:
 
         df_filtrado["comision_variable"] = (
+
             df_filtrado["total"] *
             porcentaje_comision / 100
+
         )
 
     else:
 
         df_filtrado["comision_variable"] = np.where(
+
             es_gmoney,
             0,
+
             (
                 df_filtrado["total"] *
                 porcentaje_comision / 100
             )
+
         )
 
     # =====================================================
-    # COMISION FINAL
+    # COMISION APLICADA
+    # MAYOR ENTRE VARIABLE Y MINIMA
     # =====================================================
 
-    if aplicar_comision_minima:
+    if gmoney_misma_comision:
 
-        if gmoney_misma_comision:
+        df_filtrado["comision_aplicada"] = np.maximum(
 
-            df_filtrado["comision_final"] = np.maximum(
-                df_filtrado["comision_variable"],
-                comision_minima
-            )
+            df_filtrado["comision_variable"],
+            comision_minima
 
-        else:
-
-            df_filtrado["comision_final"] = np.where(
-                es_gmoney,
-                0,
-                np.maximum(
-                    df_filtrado["comision_variable"],
-                    comision_minima
-                )
-            )
+        )
 
     else:
 
-        df_filtrado["comision_final"] = (
-            df_filtrado["comision_variable"]
+        df_filtrado["comision_aplicada"] = np.where(
+
+            es_gmoney,
+            0,
+
+            np.maximum(
+
+                df_filtrado["comision_variable"],
+                comision_minima
+
+            )
+
         )
 
     # =====================================================
@@ -325,9 +321,11 @@ if archivo is not None:
     else:
 
         df_filtrado["tarifa_fija"] = np.where(
+
             es_gmoney,
             0,
             tarifa_fija
+
         )
 
     # =====================================================
@@ -341,9 +339,11 @@ if archivo is not None:
     else:
 
         df_filtrado["fee_gmoney"] = np.where(
+
             es_gmoney,
             tarifa_gmoney,
             0
+
         )
 
     # =====================================================
@@ -352,11 +352,12 @@ if archivo is not None:
 
     df_filtrado["igv"] = (
 
-        df_filtrado["comision_final"] +
+        df_filtrado["comision_aplicada"] +
 
         df_filtrado["tarifa_fija"] +
 
         df_filtrado["fee_gmoney"]
+
     )
 
     # =====================================================
@@ -374,8 +375,11 @@ if archivo is not None:
     # =====================================================
 
     df_filtrado["neto"] = (
+
         df_filtrado["total"] -
+
         df_filtrado["igv"]
+
     )
 
     # =====================================================
@@ -383,23 +387,28 @@ if archivo is not None:
     # =====================================================
 
     columnas_redondeo = [
+
         "comision_variable",
-        "comision_final",
+        "comision_aplicada",
         "tarifa_fija",
         "fee_gmoney",
         "igv",
         "neto"
+
     ]
 
     for col in columnas_redondeo:
 
         df_filtrado[col] = (
+
             pd.to_numeric(
                 df_filtrado[col],
                 errors="coerce"
             )
+
             .fillna(0)
             .round(2)
+
         )
 
     # =====================================================
@@ -407,6 +416,8 @@ if archivo is not None:
     # =====================================================
 
     df_resultado = df_filtrado.copy()
+
+    # EVITAR ERROR PYARROW
 
     for col in df_resultado.columns:
 
@@ -541,6 +552,10 @@ if archivo is not None:
         file_name=f"reporte_instapayouts_{mes_seleccionado}_{moneda_seleccionada}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
+# =====================================================
+# SIN ARCHIVO
+# =====================================================
 
 else:
 
