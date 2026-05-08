@@ -68,7 +68,7 @@ st.title("💸 Analizador INSTAPAYOUTS")
 st.caption("Carga tu Excel y calcula automáticamente las comisiones")
 
 # =====================================================
-# UPLOADER
+# SUBIR ARCHIVO
 # =====================================================
 
 archivo = st.file_uploader(
@@ -141,7 +141,7 @@ if archivo is not None:
     df = df[columnas_existentes].copy()
 
     # =====================================================
-    # CONVERTIR COLUMNAS PROBLEMÁTICAS
+    # CONVERTIR COLUMNAS A STRING
     # =====================================================
 
     for col in df.columns:
@@ -170,35 +170,21 @@ if archivo is not None:
     st.sidebar.header("⚙️ Configuración")
 
     porcentaje_comision = st.sidebar.number_input(
-        "Porcentaje comisión (%)",
+        "Porcentaje Comisión (%)",
         min_value=0.0,
         value=3.50,
         step=0.1
     )
 
     tarifa_fija = st.sidebar.number_input(
-        "Tarifa fija",
+        "Tarifa Fija",
         min_value=0.0,
         value=1.00,
         step=0.1
     )
 
-    comision_destino_input = st.sidebar.number_input(
-        "Comisión destino",
-        min_value=0.0,
-        value=0.00,
-        step=0.1
-    )
-
-    comision_origen_input = st.sidebar.number_input(
-        "Comisión origen",
-        min_value=0.0,
-        value=0.00,
-        step=0.1
-    )
-
     tarifa_gmoney = st.sidebar.number_input(
-        "Tarifa adicional GMONEY",
+        "Tarifa GMONEY",
         min_value=0.0,
         value=0.50,
         step=0.1
@@ -210,7 +196,7 @@ if archivo is not None:
     )
 
     # =====================================================
-    # CONVERTIR FECHA
+    # FECHA
     # =====================================================
 
     df["creacion_deuda_fecha_peru"] = pd.to_datetime(
@@ -251,30 +237,40 @@ if archivo is not None:
     ).fillna(0)
 
     # =====================================================
-    # COMISIÓN %
+    # COMISION DESTINO
+    # SOLO BCP / BBVA
     # =====================================================
 
-    df_filtrado["comision_porcentaje"] = (
-        df_filtrado["total"] *
-        porcentaje_comision / 100
+    df_filtrado["comision_destino"] = np.where(
+
+        df_filtrado["operador_dispersion"]
+        .astype(str)
+        .str.upper()
+        .str.contains("GMONEY"),
+
+        0,
+
+        (
+            df_filtrado["total"] *
+            porcentaje_comision / 100
+        )
     )
 
     # =====================================================
-    # TARIFA FIJA
+    # COMISION ORIGEN
+    # SOLO BCP / BBVA
     # =====================================================
 
-    df_filtrado["tarifa_fija"] = tarifa_fija
+    df_filtrado["comision_origen"] = np.where(
 
-    # =====================================================
-    # COMISIONES MANUALES
-    # =====================================================
+        df_filtrado["operador_dispersion"]
+        .astype(str)
+        .str.upper()
+        .str.contains("GMONEY"),
 
-    df_filtrado["comision_destino"] = (
-        comision_destino_input
-    )
+        0,
 
-    df_filtrado["comision_origen"] = (
-        comision_origen_input
+        tarifa_fija
     )
 
     # =====================================================
@@ -294,14 +290,10 @@ if archivo is not None:
     )
 
     # =====================================================
-    # TOTAL SIN IGV
+    # TOTAL COMISION
     # =====================================================
 
-    df_filtrado["total_sin_igv"] = (
-
-        df_filtrado["comision_porcentaje"] +
-
-        df_filtrado["tarifa_fija"] +
+    df_filtrado["igv"] = (
 
         df_filtrado["comision_destino"] +
 
@@ -311,26 +303,22 @@ if archivo is not None:
     )
 
     # =====================================================
-    # IGV
+    # APLICAR IGV
     # =====================================================
 
     if aplicar_igv:
 
         df_filtrado["igv"] = (
-            df_filtrado["total_sin_igv"] * 0.18
+            df_filtrado["igv"] * 1.18
         )
 
-    else:
-
-        df_filtrado["igv"] = 0
-
     # =====================================================
-    # TOTAL CON IGV
+    # NETO
     # =====================================================
 
-    df_filtrado["total_con_igv"] = (
+    df_filtrado["neto"] = (
 
-        df_filtrado["total_sin_igv"] +
+        df_filtrado["total"] -
 
         df_filtrado["igv"]
     )
@@ -340,14 +328,11 @@ if archivo is not None:
     # =====================================================
 
     columnas_redondeo = [
-        "comision_porcentaje",
-        "tarifa_fija",
         "comision_destino",
         "comision_origen",
         "fee_gmoney",
-        "total_sin_igv",
         "igv",
-        "total_con_igv"
+        "neto"
     ]
 
     for col in columnas_redondeo:
@@ -362,7 +347,7 @@ if archivo is not None:
         )
 
     # =====================================================
-    # RESULTADO STRING
+    # RESULTADO FINAL
     # =====================================================
 
     df_resultado = df_filtrado.copy()
@@ -376,10 +361,6 @@ if archivo is not None:
             )
         except:
             pass
-
-    # =====================================================
-    # RESULTADO FINAL
-    # =====================================================
 
     st.subheader("📊 Resultado Final")
 
@@ -401,16 +382,12 @@ if archivo is not None:
         df_filtrado["total"].sum()
     )
 
-    total_comisiones = (
-        df_filtrado["total_sin_igv"].sum()
-    )
-
-    total_igv = (
+    total_comision = (
         df_filtrado["igv"].sum()
     )
 
-    total_con_igv = (
-        df_filtrado["total_con_igv"].sum()
+    total_neto = (
+        df_filtrado["neto"].sum()
     )
 
     total_gmoney = (
@@ -466,36 +443,30 @@ if archivo is not None:
     with c3:
         st.metric(
             "Total Comisión",
-            f"S/ {total_comisiones:,.2f}"
+            f"S/ {total_comision:,.2f}"
         )
 
     with c4:
         st.metric(
-            "Total con IGV",
-            f"S/ {total_con_igv:,.2f}"
+            "NETO",
+            f"S/ {total_neto:,.2f}"
         )
 
-    c5, c6, c7, c8 = st.columns(4)
+    c5, c6, c7 = st.columns(3)
 
     with c5:
-        st.metric(
-            "IGV",
-            f"S/ {total_igv:,.2f}"
-        )
-
-    with c6:
         st.metric(
             "GMONEY",
             f"S/ {total_gmoney:,.2f}"
         )
 
-    with c7:
+    with c6:
         st.metric(
             "BCP",
             f"S/ {total_bcp:,.2f}"
         )
 
-    with c8:
+    with c7:
         st.metric(
             "BBVA",
             f"S/ {total_bbva:,.2f}"
