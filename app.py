@@ -121,8 +121,7 @@ if archivo is not None:
         "cci",
         "tipo_de_cuenta",
         "estado",
-        "fecha_pagado_rechazado_peru",
-        "fee_gmoney"
+        "fecha_pagado_rechazado_peru"
     ]
 
     # =====================================================
@@ -197,6 +196,11 @@ if archivo is not None:
         step=0.1
     )
 
+    gmoney_misma_comision = st.sidebar.checkbox(
+        "GMONEY usa misma comisión",
+        value=False
+    )
+
     aplicar_igv = st.sidebar.checkbox(
         "Aplicar IGV (18%)",
         value=True
@@ -243,75 +247,91 @@ if archivo is not None:
     ]
 
     # =====================================================
+    # DETECCIÓN GMONEY
+    # =====================================================
+
+    es_gmoney = (
+        df_filtrado["operador_dispersion"]
+        .astype(str)
+        .str.upper()
+        .str.contains("GMONEY")
+    )
+
+    # =====================================================
     # COMISION VARIABLE
     # =====================================================
 
-    df_filtrado["comision_variable"] = np.where(
+    if gmoney_misma_comision:
 
-        df_filtrado["operador_dispersion"]
-        .astype(str)
-        .str.upper()
-        .str.contains("GMONEY"),
-
-        0,
-
-        (
+        df_filtrado["comision_variable"] = (
             df_filtrado["total"] *
             porcentaje_comision / 100
         )
-    )
+
+    else:
+
+        df_filtrado["comision_variable"] = np.where(
+            es_gmoney,
+            0,
+            (
+                df_filtrado["total"] *
+                porcentaje_comision / 100
+            )
+        )
 
     # =====================================================
     # COMISION FINAL
-    # MAYOR ENTRE VARIABLE Y MINIMA
     # =====================================================
 
-    df_filtrado["comision_final"] = np.where(
+    if gmoney_misma_comision:
 
-        df_filtrado["operador_dispersion"]
-        .astype(str)
-        .str.upper()
-        .str.contains("GMONEY"),
-
-        0,
-
-        np.maximum(
+        df_filtrado["comision_final"] = np.maximum(
             df_filtrado["comision_variable"],
             comision_minima
         )
-    )
+
+    else:
+
+        df_filtrado["comision_final"] = np.where(
+            es_gmoney,
+            0,
+            np.maximum(
+                df_filtrado["comision_variable"],
+                comision_minima
+            )
+        )
 
     # =====================================================
     # TARIFA FIJA
     # =====================================================
 
-    df_filtrado["tarifa_fija"] = np.where(
+    if gmoney_misma_comision:
 
-        df_filtrado["operador_dispersion"]
-        .astype(str)
-        .str.upper()
-        .str.contains("GMONEY"),
+        df_filtrado["tarifa_fija"] = tarifa_fija
 
-        0,
+    else:
 
-        tarifa_fija
-    )
+        df_filtrado["tarifa_fija"] = np.where(
+            es_gmoney,
+            0,
+            tarifa_fija
+        )
 
     # =====================================================
     # FEE GMONEY
     # =====================================================
 
-    df_filtrado["fee_gmoney"] = np.where(
+    if gmoney_misma_comision:
 
-        df_filtrado["operador_dispersion"]
-        .astype(str)
-        .str.upper()
-        .str.contains("GMONEY"),
+        df_filtrado["fee_gmoney"] = 0
 
-        tarifa_gmoney,
+    else:
 
-        0
-    )
+        df_filtrado["fee_gmoney"] = np.where(
+            es_gmoney,
+            tarifa_gmoney,
+            0
+        )
 
     # =====================================================
     # TOTAL COMISION
@@ -341,9 +361,7 @@ if archivo is not None:
     # =====================================================
 
     df_filtrado["neto"] = (
-
         df_filtrado["total"] -
-
         df_filtrado["igv"]
     )
 
@@ -376,8 +394,6 @@ if archivo is not None:
     # =====================================================
 
     df_resultado = df_filtrado.copy()
-
-    # EVITAR ERROR PYARROW
 
     for col in df_resultado.columns:
 
@@ -418,39 +434,25 @@ if archivo is not None:
     )
 
     total_gmoney = (
-
-        df_filtrado[
-            df_filtrado["operador_dispersion"]
-            .astype(str)
-            .str.upper()
-            .str.contains("GMONEY")
-        ]["total"]
-
-        .sum()
+        df_filtrado[es_gmoney]["total"].sum()
     )
 
     total_bcp = (
-
         df_filtrado[
             df_filtrado["operador_dispersion"]
             .astype(str)
             .str.upper()
             .str.contains("BCP")
-        ]["total"]
-
-        .sum()
+        ]["total"].sum()
     )
 
     total_bbva = (
-
         df_filtrado[
             df_filtrado["operador_dispersion"]
             .astype(str)
             .str.upper()
             .str.contains("BBVA")
-        ]["total"]
-
-        .sum()
+        ]["total"].sum()
     )
 
     c1, c2, c3, c4 = st.columns(4)
