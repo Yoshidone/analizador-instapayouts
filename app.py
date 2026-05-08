@@ -45,8 +45,8 @@ h1, h2, h3 {
     background-color: #16a34a;
     color: white;
     border-radius: 10px;
-    border: none;
     padding: 0.5rem 1rem;
+    border: none;
     font-weight: 600;
 }
 
@@ -68,7 +68,7 @@ st.title("💸 Analizador INSTAPAYOUTS")
 st.caption("Carga tu Excel y calcula automáticamente las comisiones")
 
 # =====================================================
-# SUBIR ARCHIVO
+# UPLOADER
 # =====================================================
 
 archivo = st.file_uploader(
@@ -94,7 +94,7 @@ if archivo is not None:
 
     except Exception as e:
 
-        st.error(f"Error al leer el archivo: {e}")
+        st.error(f"❌ Error al leer archivo: {e}")
         st.stop()
 
     # =====================================================
@@ -141,19 +141,30 @@ if archivo is not None:
     df = df[columnas_existentes].copy()
 
     # =====================================================
+    # CONVERTIR COLUMNAS PROBLEMÁTICAS
+    # =====================================================
+
+    for col in df.columns:
+
+        try:
+            df[col] = df[col].astype(str)
+        except:
+            pass
+
+    # =====================================================
     # VISTA PREVIA
     # =====================================================
 
     st.subheader("📋 Vista previa")
 
     st.dataframe(
-        df,
+        df.head(100),
         use_container_width=True,
         height=500
     )
 
     # =====================================================
-    # SIDEBAR CONFIGURACIÓN
+    # SIDEBAR
     # =====================================================
 
     st.sidebar.header("⚙️ Configuración")
@@ -199,7 +210,7 @@ if archivo is not None:
     )
 
     # =====================================================
-    # FECHAS
+    # CONVERTIR FECHA
     # =====================================================
 
     df["creacion_deuda_fecha_peru"] = pd.to_datetime(
@@ -207,20 +218,28 @@ if archivo is not None:
         errors="coerce"
     )
 
+    # =====================================================
+    # MES
+    # =====================================================
+
     df["mes"] = df["creacion_deuda_fecha_peru"].dt.strftime("%Y-%m")
 
     # =====================================================
     # FILTRO MES
     # =====================================================
 
-    meses = sorted(df["mes"].dropna().unique())
+    meses = sorted(
+        df["mes"].dropna().unique()
+    )
 
     mes_seleccionado = st.selectbox(
         "📅 Selecciona el mes",
         meses
     )
 
-    df_filtrado = df[df["mes"] == mes_seleccionado].copy()
+    df_filtrado = df[
+        df["mes"] == mes_seleccionado
+    ].copy()
 
     # =====================================================
     # TOTAL NUMÉRICO
@@ -236,7 +255,8 @@ if archivo is not None:
     # =====================================================
 
     df_filtrado["comision_porcentaje"] = (
-        df_filtrado["total"] * porcentaje_comision / 100
+        df_filtrado["total"] *
+        porcentaje_comision / 100
     )
 
     # =====================================================
@@ -249,15 +269,20 @@ if archivo is not None:
     # COMISIONES MANUALES
     # =====================================================
 
-    df_filtrado["comision_destino"] = comision_destino_input
+    df_filtrado["comision_destino"] = (
+        comision_destino_input
+    )
 
-    df_filtrado["comision_origen"] = comision_origen_input
+    df_filtrado["comision_origen"] = (
+        comision_origen_input
+    )
 
     # =====================================================
     # GMONEY
     # =====================================================
 
     df_filtrado["fee_gmoney"] = np.where(
+
         df_filtrado["operador_dispersion"]
         .astype(str)
         .str.upper()
@@ -273,10 +298,15 @@ if archivo is not None:
     # =====================================================
 
     df_filtrado["total_sin_igv"] = (
+
         df_filtrado["comision_porcentaje"] +
+
         df_filtrado["tarifa_fija"] +
+
         df_filtrado["comision_destino"] +
+
         df_filtrado["comision_origen"] +
+
         df_filtrado["fee_gmoney"]
     )
 
@@ -299,7 +329,9 @@ if archivo is not None:
     # =====================================================
 
     df_filtrado["total_con_igv"] = (
+
         df_filtrado["total_sin_igv"] +
+
         df_filtrado["igv"]
     )
 
@@ -330,13 +362,29 @@ if archivo is not None:
         )
 
     # =====================================================
+    # RESULTADO STRING
+    # =====================================================
+
+    df_resultado = df_filtrado.copy()
+
+    for col in df_resultado.columns:
+
+        try:
+            df_resultado[col] = (
+                df_resultado[col]
+                .astype(str)
+            )
+        except:
+            pass
+
+    # =====================================================
     # RESULTADO FINAL
     # =====================================================
 
     st.subheader("📊 Resultado Final")
 
     st.dataframe(
-        df_filtrado,
+        df_resultado,
         use_container_width=True,
         height=600
     )
@@ -349,41 +397,55 @@ if archivo is not None:
 
     total_operaciones = len(df_filtrado)
 
-    total_procesado = df_filtrado["total"].sum()
+    total_procesado = (
+        df_filtrado["total"].sum()
+    )
 
-    total_comisiones = df_filtrado["total_sin_igv"].sum()
+    total_comisiones = (
+        df_filtrado["total_sin_igv"].sum()
+    )
 
-    total_igv = df_filtrado["igv"].sum()
+    total_igv = (
+        df_filtrado["igv"].sum()
+    )
 
-    total_con_igv = df_filtrado["total_con_igv"].sum()
+    total_con_igv = (
+        df_filtrado["total_con_igv"].sum()
+    )
 
     total_gmoney = (
+
         df_filtrado[
             df_filtrado["operador_dispersion"]
             .astype(str)
             .str.upper()
             .str.contains("GMONEY")
         ]["total"]
+
         .sum()
     )
 
     total_bcp = (
+
         df_filtrado[
             df_filtrado["operador_dispersion"]
             .astype(str)
             .str.upper()
             .str.contains("BCP")
         ]["total"]
+
         .sum()
     )
 
     total_bbva = (
+
         df_filtrado[
             df_filtrado["operador_dispersion"]
             .astype(str)
             .str.upper()
             .str.contains("BBVA")
         ]["total"]
+
         .sum()
     )
 
@@ -473,4 +535,6 @@ if archivo is not None:
 
 else:
 
-    st.info("👆 Sube un archivo Excel para comenzar")
+    st.info(
+        "👆 Sube un archivo Excel para comenzar"
+    )
