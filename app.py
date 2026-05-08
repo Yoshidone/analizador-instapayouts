@@ -172,7 +172,7 @@ if archivo is not None:
     porcentaje_comision = st.sidebar.number_input(
         "Porcentaje Comisión (%)",
         min_value=0.0,
-        value=3.50,
+        value=1.20,
         step=0.1
     )
 
@@ -180,6 +180,13 @@ if archivo is not None:
         "Tarifa Fija",
         min_value=0.0,
         value=1.00,
+        step=0.1
+    )
+
+    comision_minima = st.sidebar.number_input(
+        "Comisión mínima",
+        min_value=0.0,
+        value=3.30,
         step=0.1
     )
 
@@ -236,11 +243,10 @@ if archivo is not None:
     ]
 
     # =====================================================
-    # PORCENTAJE COMISION
-    # SOLO SI NO ES GMONEY
+    # COMISION VARIABLE
     # =====================================================
 
-    df_filtrado["porcentaje_comision"] = np.where(
+    df_filtrado["comision_variable"] = np.where(
 
         df_filtrado["operador_dispersion"]
         .astype(str)
@@ -256,8 +262,27 @@ if archivo is not None:
     )
 
     # =====================================================
+    # COMISION FINAL
+    # MAYOR ENTRE VARIABLE Y MINIMA
+    # =====================================================
+
+    df_filtrado["comision_final"] = np.where(
+
+        df_filtrado["operador_dispersion"]
+        .astype(str)
+        .str.upper()
+        .str.contains("GMONEY"),
+
+        0,
+
+        np.maximum(
+            df_filtrado["comision_variable"],
+            comision_minima
+        )
+    )
+
+    # =====================================================
     # TARIFA FIJA
-    # SOLO SI NO ES GMONEY
     # =====================================================
 
     df_filtrado["tarifa_fija"] = np.where(
@@ -289,12 +314,12 @@ if archivo is not None:
     )
 
     # =====================================================
-    # IGV
+    # TOTAL COMISION
     # =====================================================
 
     df_filtrado["igv"] = (
 
-        df_filtrado["porcentaje_comision"] +
+        df_filtrado["comision_final"] +
 
         df_filtrado["tarifa_fija"] +
 
@@ -327,7 +352,8 @@ if archivo is not None:
     # =====================================================
 
     columnas_redondeo = [
-        "porcentaje_comision",
+        "comision_variable",
+        "comision_final",
         "tarifa_fija",
         "fee_gmoney",
         "igv",
