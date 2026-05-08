@@ -6,6 +6,7 @@ from io import BytesIO
 # =====================================================
 # CONFIGURACIÓN
 # =====================================================
+
 st.set_page_config(
     page_title="Analizador INSTAPAYOUTS",
     page_icon="💸",
@@ -15,6 +16,7 @@ st.set_page_config(
 # =====================================================
 # ESTILOS
 # =====================================================
+
 st.markdown("""
 <style>
 
@@ -61,70 +63,131 @@ h1, h2, h3 {
 # =====================================================
 # TÍTULO
 # =====================================================
+
 st.title("💸 Analizador INSTAPAYOUTS")
-st.caption("Carga tu Excel y calcula comisiones automáticamente")
+st.caption("Carga tu Excel y calcula automáticamente las comisiones")
 
 # =====================================================
 # SUBIR ARCHIVO
 # =====================================================
+
 archivo = st.file_uploader(
     "📂 Subir archivo Excel",
     type=["xlsx", "xls"]
 )
 
 # =====================================================
-# VALIDACIÓN
+# SI EXISTE ARCHIVO
 # =====================================================
+
 if archivo is not None:
 
     # =====================================================
     # LEER EXCEL
     # =====================================================
+
     try:
+
         df = pd.read_excel(archivo)
 
         st.success("✅ Archivo cargado correctamente")
 
     except Exception as e:
+
         st.error(f"Error al leer el archivo: {e}")
         st.stop()
 
     # =====================================================
     # LIMPIAR COLUMNAS
     # =====================================================
+
     df.columns = df.columns.str.strip().str.lower()
 
     # =====================================================
-    # PREVIEW
+    # COLUMNAS IMPORTANTES
     # =====================================================
+
+    columnas_importantes = [
+        "creacion_deuda_fecha_peru",
+        "cus_name",
+        "operador_dispersion",
+        "referencia",
+        "moneda",
+        "total",
+        "tipo_de_documento",
+        "numero_documento",
+        "cliente",
+        "cuenta",
+        "cci",
+        "tipo_de_cuenta",
+        "estado",
+        "fecha_pagado_rechazado_peru",
+        "itf",
+        "comision_destino",
+        "comision_origen",
+        "yape_id",
+        "fee_gmoney"
+    ]
+
+    # =====================================================
+    # SOLO COLUMNAS IMPORTANTES
+    # =====================================================
+
+    columnas_existentes = [
+        col for col in columnas_importantes
+        if col in df.columns
+    ]
+
+    df = df[columnas_existentes].copy()
+
+    # =====================================================
+    # VISTA PREVIA
+    # =====================================================
+
     st.subheader("📋 Vista previa")
 
     st.dataframe(
-        df.head(20),
-        use_container_width=True
+        df,
+        use_container_width=True,
+        height=500
     )
 
     # =====================================================
-    # SIDEBAR
+    # SIDEBAR CONFIGURACIÓN
     # =====================================================
+
     st.sidebar.header("⚙️ Configuración")
 
-    porcentaje = st.sidebar.number_input(
+    porcentaje_comision = st.sidebar.number_input(
         "Porcentaje comisión (%)",
         min_value=0.0,
         value=3.50,
         step=0.1
     )
 
-    fee_fijo = st.sidebar.number_input(
-        "Fee fijo",
+    tarifa_fija = st.sidebar.number_input(
+        "Tarifa fija",
         min_value=0.0,
         value=1.00,
         step=0.1
     )
 
-    fee_gmoney = st.sidebar.number_input(
-        "Fee adicional GMONEY",
+    comision_destino_input = st.sidebar.number_input(
+        "Comisión destino",
+        min_value=0.0,
+        value=0.00,
+        step=0.1
+    )
+
+    comision_origen_input = st.sidebar.number_input(
+        "Comisión origen",
+        min_value=0.0,
+        value=0.00,
+        step=0.1
+    )
+
+    tarifa_gmoney = st.sidebar.number_input(
+        "Tarifa adicional GMONEY",
         min_value=0.0,
         value=0.50,
         step=0.1
@@ -136,52 +199,20 @@ if archivo is not None:
     )
 
     # =====================================================
-    # COLUMNAS
+    # FECHAS
     # =====================================================
-    columnas = df.columns.tolist()
 
-    st.subheader("🔎 Configuración de columnas")
+    df["creacion_deuda_fecha_peru"] = pd.to_datetime(
+        df["creacion_deuda_fecha_peru"],
+        errors="coerce"
+    )
 
-    c1, c2, c3 = st.columns(3)
-
-    with c1:
-        columna_monto = st.selectbox(
-            "Columna monto",
-            columnas
-        )
-
-    with c2:
-        columna_fecha = st.selectbox(
-            "Columna fecha",
-            columnas
-        )
-
-    with c3:
-        columna_gmoney = st.selectbox(
-            "Columna fee_gmoney",
-            columnas,
-            index=columnas.index("fee_gmoney") if "fee_gmoney" in columnas else 0
-        )
-
-    # =====================================================
-    # FECHA
-    # =====================================================
-    try:
-
-        df[columna_fecha] = pd.to_datetime(
-            df[columna_fecha],
-            errors="coerce"
-        )
-
-        df["mes"] = df[columna_fecha].dt.strftime("%Y-%m")
-
-    except:
-        st.error("❌ No se pudo convertir la columna fecha")
-        st.stop()
+    df["mes"] = df["creacion_deuda_fecha_peru"].dt.strftime("%Y-%m")
 
     # =====================================================
     # FILTRO MES
     # =====================================================
+
     meses = sorted(df["mes"].dropna().unique())
 
     mes_seleccionado = st.selectbox(
@@ -192,40 +223,67 @@ if archivo is not None:
     df_filtrado = df[df["mes"] == mes_seleccionado].copy()
 
     # =====================================================
-    # MONTO NUMÉRICO
+    # TOTAL NUMÉRICO
     # =====================================================
-    df_filtrado[columna_monto] = pd.to_numeric(
-        df_filtrado[columna_monto],
+
+    df_filtrado["total"] = pd.to_numeric(
+        df_filtrado["total"],
         errors="coerce"
     ).fillna(0)
 
     # =====================================================
-    # COMISIONES
+    # COMISIÓN %
     # =====================================================
 
-    # Comisión %
     df_filtrado["comision_porcentaje"] = (
-        df_filtrado[columna_monto] * porcentaje / 100
+        df_filtrado["total"] * porcentaje_comision / 100
     )
 
-    # Fee fijo
-    df_filtrado["fee_fijo_resultado"] = fee_fijo
+    # =====================================================
+    # TARIFA FIJA
+    # =====================================================
 
-    # Comisión GMONEY
-    df_filtrado["comision_gmoney"] = np.where(
-        df_filtrado[columna_gmoney].notna(),
-        fee_gmoney,
+    df_filtrado["tarifa_fija"] = tarifa_fija
+
+    # =====================================================
+    # COMISIONES MANUALES
+    # =====================================================
+
+    df_filtrado["comision_destino"] = comision_destino_input
+
+    df_filtrado["comision_origen"] = comision_origen_input
+
+    # =====================================================
+    # GMONEY
+    # =====================================================
+
+    df_filtrado["fee_gmoney"] = np.where(
+        df_filtrado["operador_dispersion"]
+        .astype(str)
+        .str.upper()
+        .str.contains("GMONEY"),
+
+        tarifa_gmoney,
+
         0
     )
 
-    # Total sin IGV
+    # =====================================================
+    # TOTAL SIN IGV
+    # =====================================================
+
     df_filtrado["total_sin_igv"] = (
         df_filtrado["comision_porcentaje"] +
-        df_filtrado["fee_fijo_resultado"] +
-        df_filtrado["comision_gmoney"]
+        df_filtrado["tarifa_fija"] +
+        df_filtrado["comision_destino"] +
+        df_filtrado["comision_origen"] +
+        df_filtrado["fee_gmoney"]
     )
 
+    # =====================================================
     # IGV
+    # =====================================================
+
     if aplicar_igv:
 
         df_filtrado["igv"] = (
@@ -236,7 +294,10 @@ if archivo is not None:
 
         df_filtrado["igv"] = 0
 
-    # Total con IGV
+    # =====================================================
+    # TOTAL CON IGV
+    # =====================================================
+
     df_filtrado["total_con_igv"] = (
         df_filtrado["total_sin_igv"] +
         df_filtrado["igv"]
@@ -245,98 +306,143 @@ if archivo is not None:
     # =====================================================
     # REDONDEO
     # =====================================================
+
     columnas_redondeo = [
         "comision_porcentaje",
-        "fee_fijo_resultado",
-        "comision_gmoney",
+        "tarifa_fija",
+        "comision_destino",
+        "comision_origen",
+        "fee_gmoney",
         "total_sin_igv",
         "igv",
         "total_con_igv"
     ]
 
     for col in columnas_redondeo:
-        df_filtrado[col] = df_filtrado[col].round(2)
+
+        df_filtrado[col] = (
+            pd.to_numeric(
+                df_filtrado[col],
+                errors="coerce"
+            )
+            .fillna(0)
+            .round(2)
+        )
 
     # =====================================================
-    # RESULTADO
+    # RESULTADO FINAL
     # =====================================================
+
     st.subheader("📊 Resultado Final")
 
     st.dataframe(
         df_filtrado,
         use_container_width=True,
-        height=500
+        height=600
     )
 
     # =====================================================
     # DASHBOARD
     # =====================================================
+
     st.subheader("📈 Dashboard")
 
     total_operaciones = len(df_filtrado)
 
-    monto_total = df_filtrado[columna_monto].sum()
+    total_procesado = df_filtrado["total"].sum()
 
-    total_sin_igv = df_filtrado["total_sin_igv"].sum()
+    total_comisiones = df_filtrado["total_sin_igv"].sum()
 
     total_igv = df_filtrado["igv"].sum()
 
     total_con_igv = df_filtrado["total_con_igv"].sum()
 
-    d1, d2, d3, d4, d5 = st.columns(5)
+    total_gmoney = (
+        df_filtrado[
+            df_filtrado["operador_dispersion"]
+            .astype(str)
+            .str.upper()
+            .str.contains("GMONEY")
+        ]["total"]
+        .sum()
+    )
 
-    with d1:
+    total_bcp = (
+        df_filtrado[
+            df_filtrado["operador_dispersion"]
+            .astype(str)
+            .str.upper()
+            .str.contains("BCP")
+        ]["total"]
+        .sum()
+    )
+
+    total_bbva = (
+        df_filtrado[
+            df_filtrado["operador_dispersion"]
+            .astype(str)
+            .str.upper()
+            .str.contains("BBVA")
+        ]["total"]
+        .sum()
+    )
+
+    c1, c2, c3, c4 = st.columns(4)
+
+    with c1:
         st.metric(
             "Operaciones",
             f"{total_operaciones:,}"
         )
 
-    with d2:
+    with c2:
         st.metric(
-            "Monto Total",
-            f"S/ {monto_total:,.2f}"
+            "Total Procesado",
+            f"S/ {total_procesado:,.2f}"
         )
 
-    with d3:
+    with c3:
         st.metric(
-            "Total Sin IGV",
-            f"S/ {total_sin_igv:,.2f}"
+            "Total Comisión",
+            f"S/ {total_comisiones:,.2f}"
         )
 
-    with d4:
+    with c4:
+        st.metric(
+            "Total con IGV",
+            f"S/ {total_con_igv:,.2f}"
+        )
+
+    c5, c6, c7, c8 = st.columns(4)
+
+    with c5:
         st.metric(
             "IGV",
             f"S/ {total_igv:,.2f}"
         )
 
-    with d5:
+    with c6:
         st.metric(
-            "Total Con IGV",
-            f"S/ {total_con_igv:,.2f}"
+            "GMONEY",
+            f"S/ {total_gmoney:,.2f}"
+        )
+
+    with c7:
+        st.metric(
+            "BCP",
+            f"S/ {total_bcp:,.2f}"
+        )
+
+    with c8:
+        st.metric(
+            "BBVA",
+            f"S/ {total_bbva:,.2f}"
         )
 
     # =====================================================
-    # RESUMEN
+    # DESCARGAR EXCEL
     # =====================================================
-    st.subheader("📌 Resumen por Mes")
 
-    resumen = df.groupby("mes").agg({
-        columna_monto: "sum"
-    }).reset_index()
-
-    resumen.columns = [
-        "Mes",
-        "Monto Total"
-    ]
-
-    st.dataframe(
-        resumen,
-        use_container_width=True
-    )
-
-    # =====================================================
-    # DESCARGA EXCEL
-    # =====================================================
     st.subheader("⬇️ Descargar Reporte")
 
     output = BytesIO()
@@ -352,12 +458,6 @@ if archivo is not None:
             sheet_name="Reporte"
         )
 
-        resumen.to_excel(
-            writer,
-            index=False,
-            sheet_name="Resumen"
-        )
-
     excel_data = output.getvalue()
 
     st.download_button(
@@ -366,3 +466,11 @@ if archivo is not None:
         file_name=f"reporte_instapayouts_{mes_seleccionado}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
+# =====================================================
+# SIN ARCHIVO
+# =====================================================
+
+else:
+
+    st.info("👆 Sube un archivo Excel para comenzar")
