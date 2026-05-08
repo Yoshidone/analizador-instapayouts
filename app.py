@@ -122,8 +122,6 @@ if archivo is not None:
         "tipo_de_cuenta",
         "estado",
         "fecha_pagado_rechazado_peru",
-        "comision_destino",
-        "comision_origen",
         "fee_gmoney"
     ]
 
@@ -139,26 +137,30 @@ if archivo is not None:
     df = df[columnas_existentes].copy()
 
     # =====================================================
-    # CONVERTIR A STRING
+    # FECHAS
     # =====================================================
 
-    for col in df.columns:
-
-        try:
-            df[col] = df[col].astype(str)
-        except:
-            pass
+    df["creacion_deuda_fecha_peru"] = pd.to_datetime(
+        df["creacion_deuda_fecha_peru"],
+        errors="coerce"
+    )
 
     # =====================================================
-    # VISTA PREVIA
+    # TOTAL NUMÉRICO
     # =====================================================
 
-    st.subheader("📋 Vista previa")
+    df["total"] = pd.to_numeric(
+        df["total"],
+        errors="coerce"
+    ).fillna(0)
 
-    st.dataframe(
-        df.head(100),
-        use_container_width=True,
-        height=500
+    # =====================================================
+    # MES
+    # =====================================================
+
+    df["mes"] = (
+        df["creacion_deuda_fecha_peru"]
+        .dt.strftime("%Y-%m")
     )
 
     # =====================================================
@@ -194,26 +196,13 @@ if archivo is not None:
     )
 
     # =====================================================
-    # FECHAS
-    # =====================================================
-
-    df["creacion_deuda_fecha_peru"] = pd.to_datetime(
-        df["creacion_deuda_fecha_peru"],
-        errors="coerce"
-    )
-
-    # =====================================================
-    # MES
-    # =====================================================
-
-    df["mes"] = df["creacion_deuda_fecha_peru"].dt.strftime("%Y-%m")
-
-    # =====================================================
-    # FILTRO POR MES
+    # FILTRO MES
     # =====================================================
 
     meses = sorted(
-        df["mes"].dropna().unique()
+        df["mes"]
+        .dropna()
+        .unique()
     )
 
     mes_seleccionado = st.selectbox(
@@ -226,20 +215,32 @@ if archivo is not None:
     ].copy()
 
     # =====================================================
-    # TOTAL NUMÉRICO
+    # FILTRO MONEDA
     # =====================================================
 
-    df_filtrado["total"] = pd.to_numeric(
-        df_filtrado["total"],
-        errors="coerce"
-    ).fillna(0)
+    monedas = sorted(
+        df_filtrado["moneda"]
+        .dropna()
+        .astype(str)
+        .unique()
+    )
+
+    moneda_seleccionada = st.selectbox(
+        "💵 Selecciona moneda",
+        monedas
+    )
+
+    df_filtrado = df_filtrado[
+        df_filtrado["moneda"]
+        == moneda_seleccionada
+    ]
 
     # =====================================================
-    # COMISION DESTINO
+    # PORCENTAJE COMISION
     # SOLO SI NO ES GMONEY
     # =====================================================
 
-    df_filtrado["comision_destino"] = np.where(
+    df_filtrado["porcentaje_comision"] = np.where(
 
         df_filtrado["operador_dispersion"]
         .astype(str)
@@ -255,11 +256,11 @@ if archivo is not None:
     )
 
     # =====================================================
-    # COMISION ORIGEN
+    # TARIFA FIJA
     # SOLO SI NO ES GMONEY
     # =====================================================
 
-    df_filtrado["comision_origen"] = np.where(
+    df_filtrado["tarifa_fija"] = np.where(
 
         df_filtrado["operador_dispersion"]
         .astype(str)
@@ -288,14 +289,14 @@ if archivo is not None:
     )
 
     # =====================================================
-    # TOTAL COMISION
+    # IGV
     # =====================================================
 
     df_filtrado["igv"] = (
 
-        df_filtrado["comision_destino"] +
+        df_filtrado["porcentaje_comision"] +
 
-        df_filtrado["comision_origen"] +
+        df_filtrado["tarifa_fija"] +
 
         df_filtrado["fee_gmoney"]
     )
@@ -326,8 +327,8 @@ if archivo is not None:
     # =====================================================
 
     columnas_redondeo = [
-        "comision_destino",
-        "comision_origen",
+        "porcentaje_comision",
+        "tarifa_fija",
         "fee_gmoney",
         "igv",
         "neto"
@@ -348,24 +349,12 @@ if archivo is not None:
     # RESULTADO FINAL
     # =====================================================
 
-    df_resultado = df_filtrado.copy()
-
-    for col in df_resultado.columns:
-
-        try:
-            df_resultado[col] = (
-                df_resultado[col]
-                .astype(str)
-            )
-        except:
-            pass
-
     st.subheader("📊 Resultado Final")
 
     st.dataframe(
-        df_resultado,
+        df_filtrado,
         use_container_width=True,
-        height=600
+        height=650
     )
 
     # =====================================================
@@ -434,20 +423,20 @@ if archivo is not None:
 
     with c2:
         st.metric(
-            "Total Procesado",
-            f"S/ {total_procesado:,.2f}"
+            f"Total {moneda_seleccionada}",
+            f"{moneda_seleccionada} {total_procesado:,.2f}"
         )
 
     with c3:
         st.metric(
             "Total Comisión",
-            f"S/ {total_comision:,.2f}"
+            f"{moneda_seleccionada} {total_comision:,.2f}"
         )
 
     with c4:
         st.metric(
             "NETO",
-            f"S/ {total_neto:,.2f}"
+            f"{moneda_seleccionada} {total_neto:,.2f}"
         )
 
     c5, c6, c7 = st.columns(3)
@@ -455,19 +444,19 @@ if archivo is not None:
     with c5:
         st.metric(
             "GMONEY",
-            f"S/ {total_gmoney:,.2f}"
+            f"{moneda_seleccionada} {total_gmoney:,.2f}"
         )
 
     with c6:
         st.metric(
             "BCP",
-            f"S/ {total_bcp:,.2f}"
+            f"{moneda_seleccionada} {total_bcp:,.2f}"
         )
 
     with c7:
         st.metric(
             "BBVA",
-            f"S/ {total_bbva:,.2f}"
+            f"{moneda_seleccionada} {total_bbva:,.2f}"
         )
 
     # =====================================================
@@ -494,7 +483,7 @@ if archivo is not None:
     st.download_button(
         label="📥 Descargar Excel Final",
         data=excel_data,
-        file_name=f"reporte_instapayouts_{mes_seleccionado}.xlsx",
+        file_name=f"reporte_instapayouts_{mes_seleccionado}_{moneda_seleccionada}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
