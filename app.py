@@ -162,24 +162,10 @@ if archivo is not None:
 
     st.sidebar.header("⚙️ Configuración")
 
-    porcentaje_comision = st.sidebar.number_input(
-        "Porcentaje Comisión (%)",
-        min_value=0.0,
-        value=1.10,
-        step=0.1
-    )
-
     tarifa_fija = st.sidebar.number_input(
         "Tarifa Fija",
         min_value=0.0,
         value=0.00,
-        step=0.1
-    )
-
-    comision_minima = st.sidebar.number_input(
-        "Comisión mínima",
-        min_value=0.0,
-        value=3.10,
         step=0.1
     )
 
@@ -198,6 +184,54 @@ if archivo is not None:
     aplicar_igv = st.sidebar.checkbox(
         "Aplicar IGV (18%)",
         value=True
+    )
+
+    # =====================================================
+    # CONFIGURACION RANGOS
+    # =====================================================
+
+    st.sidebar.subheader("📌 Reglas de Comisión")
+
+    monto_limite_1 = st.sidebar.number_input(
+        "Hasta monto",
+        min_value=0.0,
+        value=500.0,
+        step=100.0
+    )
+
+    comision_hasta_500 = st.sidebar.number_input(
+        "Comisión % hasta 500",
+        min_value=0.0,
+        value=0.72,
+        step=0.01
+    )
+
+    monto_limite_2 = st.sidebar.number_input(
+        "Desde monto fijo",
+        min_value=0.0,
+        value=500.01,
+        step=100.0
+    )
+
+    monto_limite_3 = st.sidebar.number_input(
+        "Hasta monto fijo",
+        min_value=0.0,
+        value=3000.0,
+        step=100.0
+    )
+
+    comision_fija_rango = st.sidebar.number_input(
+        "Comisión fija rango",
+        min_value=0.0,
+        value=3.80,
+        step=0.10
+    )
+
+    comision_mayor_3000 = st.sidebar.number_input(
+        "Comisión % mayor a 3000",
+        min_value=0.0,
+        value=1.00,
+        step=0.01
     )
 
     # =====================================================
@@ -254,61 +288,51 @@ if archivo is not None:
     )
 
     # =====================================================
-    # COMISION VARIABLE
+    # FUNCION COMISION
     # =====================================================
 
-    if gmoney_misma_comision:
+    def calcular_comision(total):
 
-        df_filtrado["comision_variable"] = (
+        # Hasta 500 = %
+        if total <= monto_limite_1:
 
-            df_filtrado["total"] *
-            porcentaje_comision / 100
-
-        )
-
-    else:
-
-        df_filtrado["comision_variable"] = np.where(
-
-            es_gmoney,
-            0,
-
-            (
-                df_filtrado["total"] *
-                porcentaje_comision / 100
+            return total * (
+                comision_hasta_500 / 100
             )
 
-        )
+        # De 500 a 3000 = fijo
+        elif monto_limite_2 <= total <= monto_limite_3:
 
-    # =====================================================
-    # COMISION APLICADA
-    # MAYOR ENTRE VARIABLE Y MINIMA
-    # =====================================================
+            return comision_fija_rango
 
-    if gmoney_misma_comision:
+        # Mayor a 3000 = %
+        else:
 
-        df_filtrado["comision_aplicada"] = np.maximum(
-
-            df_filtrado["comision_variable"],
-            comision_minima
-
-        )
-
-    else:
-
-        df_filtrado["comision_aplicada"] = np.where(
-
-            es_gmoney,
-            0,
-
-            np.maximum(
-
-                df_filtrado["comision_variable"],
-                comision_minima
-
+            return total * (
+                comision_mayor_3000 / 100
             )
 
-        )
+    # =====================================================
+    # CALCULAR COMISION
+    # =====================================================
+
+    df_filtrado["comision_aplicada"] = (
+
+        df_filtrado["total"]
+        .apply(calcular_comision)
+
+    )
+
+    # =====================================================
+    # GMONEY
+    # =====================================================
+
+    if not gmoney_misma_comision:
+
+        df_filtrado.loc[
+            es_gmoney,
+            "comision_aplicada"
+        ] = 0
 
     # =====================================================
     # TARIFA FIJA
@@ -388,7 +412,6 @@ if archivo is not None:
 
     columnas_redondeo = [
 
-        "comision_variable",
         "comision_aplicada",
         "tarifa_fija",
         "fee_gmoney",
